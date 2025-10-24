@@ -1,0 +1,36 @@
+
+import React from 'react';
+import type { GalleryImage } from '../types';
+
+const images: GalleryImage[] = [
+  { id: 1, src: 'https://picsum.photos/seed/match1/600/400', alt: '경기 중 선수들의 모습' },
+  { id: 2, src: 'https://picsum.photos/seed/match2/600/400', alt: '치열한 공중볼 다툼' },
+  { id: 3, src: 'https://picsum.photos/seed/match3/600/400', alt: '득점 후 환호하는 선수들' },
+  { id: 4, src: 'https://picsum.photos/seed/match4/600/400', alt: '감독의 작전 지시' },
+  { id: 5, src: 'https://picsum.photos/seed/match5/600/400', alt: '훈련에 매진하는 모습' },
+  { id: 6, src: 'https://picsum.photos/seed/match6/600/400', alt: '팀 단체 사진' },
+  { id: 7, src: 'https://picsum.photos/seed/match7/600/400', alt: '팬들과 함께' },
+  { id: 8, src: 'https://picsum.photos/seed/match8/600/400', alt: '우승 트로피를 들고' },
+];
+
+const GallerySection: React.FC = () => {
+  return (
+    <section className="py-12 md:py-20 bg-brand-dark" id="gallery">
+      <div className="container mx-auto px-4">
+        <h2 className="text-3xl md:text-4xl font-bold text-center mb-10 text-white">갤러리</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {images.map(image => (
+            <div key={image.id} className="group relative overflow-hidden rounded-lg cursor-pointer">
+              <img src={image.src} alt={image.alt} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
+              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors duration-300 flex items-end p-4">
+                <p className="text-white text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity duration-300">{image.alt}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default GallerySection;
