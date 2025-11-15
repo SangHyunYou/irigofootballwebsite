@@ -25,21 +25,705 @@
       }
     </script>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 
-<link rel="stylesheet" href="/index.css">
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.25.0"
-  }
-}
-</script>
-  <script type="module" crossorigin src="/assets/index-DsBUAzCb.js"></script>
+    <style>
+      /* Simple fade-in animations to replace CSS file */
+      @keyframes fadeInDown {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in-down {
+        animation: fadeInDown 0.8s ease-out forwards;
+      }
+      .animate-fade-in-up {
+        animation: fadeInUp 0.8s ease-out forwards;
+      }
+    </style>
+  <link rel="stylesheet" href="./index.css">
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://aistudiocdn.com/react@^19.2.0",
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+        "react/": "https://aistudiocdn.com/react@^19.2.0/",
+        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.25.0"
+      }
+    }
+    </script>
+  <script type="module" crossorigin src="./assets/index-C45c4odu.js"></script>
 </head>
   <body>
     <div id="root"></div>
+    <script type="text/babel" data-type="module">
+      import React, { useState, useCallback } from 'react';
+      import ReactDOM from 'react-dom/client';
+      import { GoogleGenAI, Type } from "@google/genai";
+
+      // Gemini Service
+      let ai; // GenAI instance
+
+      const initializeAi = () => {
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(apiKey => {
+              if (apiKey) {
+                ai = new GoogleGenAI({ apiKey });
+                resolve();
+              } else {
+                const errorMsg = "API Key could not be retrieved. Please ensure it's set correctly in the script properties.";
+                console.error(errorMsg);
+                reject(errorMsg);
+              }
+            })
+            .withFailureHandler(error => {
+              console.error("Failed to get API key from server:", error);
+              reject(error);
+            })
+            .getApiKey();
+        });
+      };
+      
+      const generateNewsArticle = async (prompt) => {
+        if (!ai) {
+          await initializeAi();
+        }
+
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  title: {
+                    type: Type.STRING,
+                    description: "The catchy headline of the news article in Korean.",
+                  },
+                  summary: {
+                    type: Type.STRING,
+                    description: "A short summary of the football match in Korean.",
+                  },
+                },
+                required: ["title", "summary"],
+              }
+            },
+          });
+          return response.text;
+        } catch (error) {
+          console.error("Error calling Gemini API:", error);
+          throw new Error("Failed to generate content from Gemini API.");
+        }
+      };
+
+      // Components
+
+      const LoadingSpinner = () => {
+        return (
+          <div className="flex justify-center items-center">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            <span className="ml-2">생성 중...</span>
+          </div>
+        );
+      };
+      
+      const NewsCard = ({ article }) => (
+        <div className="bg-brand-gray rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          <div className="p-6">
+            <p className="text-sm text-gray-400 mb-1">{article.date}</p>
+            <h3 className="text-xl font-bold text-white mb-2">{article.title}</h3>
+            <p className="text-gray-300 leading-relaxed">{article.summary}</p>
+          </div>
+        </div>
+      );
+      
+      const NewsSection = ({ news, onGenerate, isGenerating, error, showTitle = false }) => {
+        return (
+          <section className="py-12 md:py-20 bg-brand-dark" id="news">
+            <div className="container mx-auto px-4">
+              {showTitle && <h2 className="text-3xl md:text-4xl font-bold text-center mb-10 text-white">최신 소식</h2>}
+              <div className="flex justify-center mb-10">
+                  <button onClick={onGenerate} disabled={isGenerating} className="bg-brand-green hover:bg-green-500 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center">
+                      {isGenerating ? <LoadingSpinner /> : (
+                      <>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                          </svg>
+                          AI로 새 소식 생성
+                      </>
+                      )}
+                  </button>
+              </div>
+              {error && <p className="text-center text-red-500 mb-4">{error}</p>}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {news.map(article => <NewsCard key={article.id} article={article} />)}
+              </div>
+            </div>
+          </section>
+        );
+      };
+
+      const PlayerCard = ({ player }) => (
+        <div className="group relative overflow-hidden rounded-lg shadow-lg">
+          <img src={player.imageUrl} alt={player.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 aspect-[4/5]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+          <div className="absolute bottom-0 left-0 p-4 text-white">
+            <p className="text-sm font-semibold text-brand-green">{player.position}</p>
+            <h3 className="text-2xl font-bold">{player.name}</h3>
+          </div>
+          <div className="absolute top-0 right-0 p-4 text-white text-4xl font-black opacity-50">
+            {player.number}
+          </div>
+        </div>
+      );
+
+      const PlayersSection = ({ players, showTitle = false, title }) => {
+        return (
+          <section className="py-12 md:py-20 bg-gray-900" id="players">
+            <div className="container mx-auto px-4">
+              {showTitle && <h2 className="text-3xl md:text-4xl font-bold text-center mb-10 text-white">{title || '선수단 소개'}</h2>}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                {players.map(player => <PlayerCard key={player.id} player={player} />)}
+              </div>
+            </div>
+          </section>
+        );
+      };
+
+      const GallerySection = () => {
+        const images = [
+            { id: 1, src: 'https://picsum.photos/seed/match1/600/400', alt: '경기 중 선수들의 모습' },
+            { id: 2, src: 'https://picsum.photos/seed/match2/600/400', alt: '치열한 공중볼 다툼' },
+            { id: 3, src: 'https://picsum.photos/seed/match3/600/400', alt: '득점 후 환호하는 선수들' },
+            { id: 4, src: 'https://picsum.photos/seed/match4/600/400', alt: '감독의 작전 지시' },
+            { id: 5, src: 'https://picsum.photos/seed/match5/600/400', alt: '훈련에 매진하는 모습' },
+            { id: 6, src: 'https://picsum.photos/seed/match6/600/400', alt: '팀 단체 사진' },
+            { id: 7, src: 'https://picsum.photos/seed/match7/600/400', alt: '팬들과 함께' },
+            { id: 8, src: 'https://picsum.photos/seed/match8/600/400', alt: '우승 트로피를 들고' },
+        ];
+        return (
+            <section className="py-12 md:py-20 bg-brand-dark" id="gallery">
+            <div className="container mx-auto px-4">
+                <h2 className="text-3xl md:text-4xl font-bold text-center mb-10 text-white">갤러리</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {images.map(image => (
+                    <div key={image.id} className="group relative overflow-hidden rounded-lg cursor-pointer">
+                    <img src={image.src} alt={image.alt} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110 aspect-video" />
+                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors duration-300 flex items-end p-4">
+                        <p className="text-white text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity duration-300">{image.alt}</p>
+                    </div>
+                    </div>
+                ))}
+                </div>
+            </div>
+            </section>
+        );
+      };
+      
+      const SupportSection = () => {
+        return (
+          <section className="py-12 md:py-20 bg-gray-900" id="support">
+            <div className="container mx-auto px-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-center mb-10 text-white">후원 안내</h2>
+              <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="bg-brand-gray p-8 rounded-lg shadow-lg">
+                  <h3 className="text-2xl font-bold text-brand-green mb-4">후원 방법</h3>
+                  <p className="text-gray-300 mb-6">
+                    여러분의 소중한 후원금은 이리고 축구부 선수들의 훈련 환경 개선, 장비 구입, 대회 참가비 등
+                    선수 육성을 위해 투명하게 사용됩니다.
+                  </p>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="font-semibold text-white">후원 계좌</p>
+                      <p className="text-gray-400">전북은행 123-45-678910 (예금주: 이리고축구부후원회)</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-white">문의</p>
+                      <p className="text-gray-400">후원회 총무: 010-1234-5678</p>
+                      <p className="text-gray-400">이메일: support@irifc.supporters.com</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-brand-gray p-8 rounded-lg shadow-lg">
+                  <h3 className="text-2xl font-bold text-brand-green mb-4">후원 혜택</h3>
+                  <p className="text-gray-300 mb-6">
+                    후원회원이 되시면 다음과 같은 혜택을 드립니다.
+                  </p>
+                  <ul className="list-disc list-inside text-gray-300 space-y-2">
+                    <li>후원회 소식지 정기 발송</li>
+                    <li>주요 경기 초청 및 관람 지원</li>
+                    <li>후원회 기념품 증정 (연 1회)</li>
+                    <li>웹사이트 후원자 명단 등재</li>
+                    <li>연말정산 소득공제 혜택</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="text-center mt-12">
+                  <button className="bg-brand-green hover:bg-green-500 text-white font-bold py-4 px-10 rounded-full shadow-lg transition-transform transform hover:scale-105 duration-300 text-lg">
+                      지금 바로 후원하기
+                  </button>
+              </div>
+            </div>
+          </section>
+        );
+      };
+      
+      const OrganizationMember = ({ role, name }) => (
+        <div className="bg-brand-gray p-6 rounded-lg text-center shadow-lg transform transition-transform hover:scale-105">
+          <h4 className="text-xl font-bold text-brand-green">{role}</h4>
+          <p className="text-white text-lg mt-2">{name}</p>
+        </div>
+      );
+
+      const OrganizationSection = () => {
+        return (
+          <section className="py-12 md:py-20 bg-brand-dark" id="organization">
+            <div className="container mx-auto px-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-center mb-4 text-white">후원회 조직도</h2>
+              <p className="text-center text-gray-400 mb-12 max-w-2xl mx-auto">
+                이리고등학교 축구부의 성공적인 운영과 발전을 위해 헌신하는 후원회 임원진을 소개합니다.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <OrganizationMember role="회장" name="임낙찬" />
+                <OrganizationMember role="사무총장" name="김종보" />
+                <OrganizationMember role="총무" name="임양구" />
+                <OrganizationMember role="재무" name="김태완" />
+              </div>
+              <div className="mt-12">
+                  <h3 className="text-2xl font-bold text-center mb-8 text-white">운영 위원회</h3>
+                  <div className="flex flex-wrap justify-center gap-4 text-gray-300">
+                      <span className="bg-brand-gray py-2 px-4 rounded-full">강위원</span>
+                      <span className="bg-brand-gray py-2 px-4 rounded-full">윤위원</span>
+                      <span className="bg-brand-gray py-2 px-4 rounded-full">한위원</span>
+                      <span className="bg-brand-gray py-2 px-4 rounded-full">정위원</span>
+                      <span className="bg-brand-gray py-2 px-4 rounded-full">송위원</span>
+                  </div>
+              </div>
+            </div>
+          </section>
+        );
+      };
+
+      const SponsorList = ({ title, sponsors, children }) => (
+        <div className="bg-brand-gray p-8 rounded-lg shadow-lg">
+          <h3 className="text-2xl font-bold text-brand-green mb-6 border-b-2 border-brand-green/30 pb-3">{title}</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 text-gray-300">
+              {sponsors.map((sponsor, index) => (
+                  <p key={index} className="truncate">{sponsor}</p>
+              ))}
+          </div>
+          {children}
+        </div>
+      );
+
+      const SponsorsSection = () => {
+        const corporateSponsors = [
+          '(주)미래전자', '익산건설', '드림스포츠', '희망은행',
+          '우리식품', '강호물산', '파이팅 의류', '천하장사 햄'
+        ];
+
+        const individualSponsors = [
+          '김민준', '이서연', '박도윤', '최지우', '정하준', '윤채원',
+          '강시우', '한지민', '조은우', '서유나', '오준서', '임하윤',
+          '황선우', '권아린'
+        ];
+
+        return (
+          <section className="py-12 md:py-20 bg-gray-900" id="sponsors">
+            <div className="container mx-auto px-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-center mb-4 text-white">함께해주시는 후원자님</h2>
+              <p className="text-center text-gray-400 mb-12 max-w-3xl mx-auto">
+                이리고 축구부 선수들의 꿈을 응원해주시는 모든 분들께 진심으로 감사드립니다. 여러분의 소중한 마음이 선수들에게 큰 힘이 됩니다.
+              </p>
+              <div className="space-y-12">
+                  <SponsorList title="기업 후원" sponsors={corporateSponsors} />
+                  <SponsorList title="개인 후원" sponsors={individualSponsors} />
+              </div>
+              <div className="text-center mt-16">
+                  <p className="text-lg text-gray-300">이리고 축구부의 미래에 함께하고 싶으신가요?</p>
+                  <button className="mt-4 bg-brand-green hover:bg-green-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-transform transform hover:scale-105 duration-300">
+                      후원 문의하기
+                  </button>
+              </div>
+            </div>
+          </section>
+        );
+      };
+
+      const CoachCard = ({ coach }) => (
+        <div className="group relative overflow-hidden rounded-lg shadow-lg text-center bg-brand-gray p-6 transform transition-transform hover:scale-105">
+          <img src={coach.imageUrl} alt={coach.name} className="w-32 h-32 rounded-full mx-auto object-cover border-4 border-brand-green mb-4" />
+          <h3 className="text-xl font-bold text-white">{coach.name}</h3>
+          <p className="text-brand-green font-semibold">{coach.role}</p>
+        </div>
+      );
+
+      const CoachingStaffSection = ({ coaches }) => {
+        return (
+          <section className="py-12 md:py-20 bg-brand-dark" id="coaching-staff">
+            <div className="container mx-auto px-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-center mb-10 text-white">코치진 소개</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+                {coaches.map(coach => <CoachCard key={coach.id} coach={coach} />)}
+              </div>
+            </div>
+          </section>
+        );
+      };
+
+      const AlumnusCard = ({ alumnus }) => (
+          <div className="group relative overflow-hidden rounded-lg shadow-lg">
+              <img src={alumnus.imageUrl} alt={alumnus.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 aspect-[4/5]" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+              <div className="absolute bottom-0 left-0 p-4 text-white">
+                  <p className="text-sm font-semibold text-brand-green">{alumnus.currentTeam}</p>
+                  <h3 className="text-2xl font-bold">{alumnus.name}</h3>
+                  <p className="text-xs text-gray-300">{alumnus.graduationYear}년 졸업</p>
+              </div>
+          </div>
+      );
+
+      const AlumniSection = ({ alumni }) => {
+        return (
+          <section className="py-12 md:py-20 bg-gray-900" id="alumni">
+            <div className="container mx-auto px-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-center mb-10 text-white">자랑스러운 졸업생</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                {alumni.map(person => <AlumnusCard key={person.id} alumnus={person} />)}
+              </div>
+            </div>
+          </section>
+        );
+      };
+
+      const Hero = ({ onNavigate }) => {
+        return (
+          <div className="relative h-[60vh] md:h-[80vh] flex items-center justify-center text-white text-center">
+            <div className="absolute inset-0 bg-black opacity-60"></div>
+            <img src="https://picsum.photos/seed/stadium/1920/1080" alt="Football stadium" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="relative z-10 p-4">
+              <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-4 animate-fade-in-down">
+                승리를 향한 열정, <span className="text-brand-green">우리가 함께합니다</span>
+              </h1>
+              <p className="max-w-3xl mx-auto text-lg md:text-xl text-gray-200 mb-8 animate-fade-in-up">
+                이리고등학교 축구부의 빛나는 미래를 위해 후원회가 든든한 버팀목이 되겠습니다.
+              </p>
+              <div className="flex justify-center gap-4 animate-fade-in-up" style={{ animationDelay: '0.5s' }}>
+                <button
+                  onClick={() => onNavigate('support')}
+                  className="bg-brand-green hover:bg-green-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-transform transform hover:scale-105 duration-300"
+                >
+                  후원 참여하기
+                </button>
+                <button
+                  onClick={() => onNavigate('news')}
+                  className="bg-transparent border-2 border-white hover:bg-white hover:text-brand-dark text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all duration-300"
+                >
+                  최신 소식 보기
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      };
+      
+      const Footer = () => {
+        return (
+          <footer className="bg-gray-900 border-t border-gray-700">
+            <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
+              <div className="flex flex-col md:flex-row justify-between items-center text-center md:text-left space-y-4 md:space-y-0">
+                <div>
+                  <h3 className="text-lg font-bold text-white">이리고 축구부 후원회</h3>
+                  <p className="mt-2 text-gray-400">전북특별자치도 익산시 이리-로 123</p>
+                  <p className="text-gray-400">문의: contact@irifc.supporters.com</p>
+                </div>
+                <div className="text-gray-400">
+                  <p>&copy; {new Date().getFullYear()} 이리고 축구부 후원회. All rights reserved.</p>
+                  <p className="text-sm">대한민국의 미래를 이끌어갈 선수들을 후원합니다.</p>
+                </div>
+              </div>
+            </div>
+          </footer>
+        );
+      };
+
+      const NavLink = ({ section, activeSection, setActiveSection, children }) => (
+        <button
+          onClick={() => setActiveSection(section)}
+          className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-300 ${
+            activeSection === section
+              ? 'bg-brand-green text-white'
+              : 'text-gray-300 hover:bg-brand-gray hover:text-white'
+          }`}
+        >
+          {children}
+        </button>
+      );
+      
+      const Header = ({ activeSection, setActiveSection }) => {
+        const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+        const [isFootballSubMenuOpen, setIsFootballSubMenuOpen] = useState(false);
+
+        const isFootballSectionActive = [
+          'coaching-staff',
+          'grade-1',
+          'grade-2',
+          'grade-3',
+          'alumni',
+        ].includes(activeSection);
+        
+        const handleMobileLinkClick = (section) => {
+          setActiveSection(section);
+          setIsMobileMenuOpen(false);
+          setIsFootballSubMenuOpen(false);
+        };
+        
+        const MobileNavLink = ({ section, children }) => (
+          <button
+            onClick={() => handleMobileLinkClick(section)}
+            className={`block w-full text-left px-4 py-3 rounded-md text-base font-medium transition-colors duration-300 ${
+              activeSection === section
+                ? 'bg-brand-green text-white'
+                : 'text-gray-300 hover:bg-brand-gray hover:text-white'
+            }`}
+          >
+            {children}
+          </button>
+        );
+
+        return (
+          <header className="bg-brand-dark/80 backdrop-blur-sm sticky top-0 z-50 shadow-lg">
+            <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between h-16">
+                <div className="flex items-center">
+                  <button onClick={() => handleMobileLinkClick('home')} className="flex-shrink-0 text-white text-xl font-bold flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-2 text-brand-green" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                    </svg>
+                    <span>이리고 축구부 후원회</span>
+                  </button>
+                </div>
+                {/* Desktop Menu */}
+                <div className="hidden md:block">
+                  <div className="ml-10 flex items-baseline space-x-4">
+                    <NavLink section="home" activeSection={activeSection} setActiveSection={setActiveSection}>홈</NavLink>
+                    <NavLink section="organization" activeSection={activeSection} setActiveSection={setActiveSection}>후원회조직</NavLink>
+                    <NavLink section="sponsors" activeSection={activeSection} setActiveSection={setActiveSection}>후원자</NavLink>
+                    
+                    <div className="relative group">
+                      <button
+                        className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-300 flex items-center ${
+                          isFootballSectionActive
+                            ? 'bg-brand-green text-white'
+                            : 'text-gray-300 hover:bg-brand-gray hover:text-white'
+                        }`}
+                      >
+                        축구부
+                        <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                      </button>
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-48 bg-brand-gray rounded-md shadow-lg opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all duration-300 z-10 py-1">
+                          <a onClick={() => setActiveSection('coaching-staff')} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-brand-dark hover:text-white cursor-pointer">코치진</a>
+                          <a onClick={() => setActiveSection('grade-1')} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-brand-dark hover:text-white cursor-pointer">1학년</a>
+                          <a onClick={() => setActiveSection('grade-2')} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-brand-dark hover:text-white cursor-pointer">2학년</a>
+                          <a onClick={() => setActiveSection('grade-3')} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-brand-dark hover:text-white cursor-pointer">3학년</a>
+                          <a onClick={() => setActiveSection('alumni')} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-brand-dark hover:text-white cursor-pointer">자랑스런 졸업생</a>
+                      </div>
+                    </div>
+
+                    <NavLink section="gallery" activeSection={activeSection} setActiveSection={setActiveSection}>갤러리</NavLink>
+                    <NavLink section="news" activeSection={activeSection} setActiveSection={setActiveSection}>소식</NavLink>
+                    <NavLink section="support" activeSection={activeSection} setActiveSection={setActiveSection}>후원안내</NavLink>
+                  </div>
+                </div>
+
+                {/* Mobile Menu Button */}
+                <div className="md:hidden">
+                  <button
+                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-brand-gray focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
+                    aria-controls="mobile-menu"
+                    aria-expanded={isMobileMenuOpen}
+                  >
+                    <span className="sr-only">메인 메뉴 열기</span>
+                    {isMobileMenuOpen ? (
+                      <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    ) : (
+                      <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+
+              </div>
+            </nav>
+
+            {/* Mobile Menu Panel */}
+            <div className={`${isMobileMenuOpen ? 'block' : 'hidden'} md:hidden`} id="mobile-menu">
+              <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <MobileNavLink section="home">홈</MobileNavLink>
+                <MobileNavLink section="organization">후원회조직</MobileNavLink>
+                <MobileNavLink section="sponsors">후원자</MobileNavLink>
+
+                <div>
+                  <button
+                    onClick={() => setIsFootballSubMenuOpen(!isFootballSubMenuOpen)}
+                    className={`w-full text-left flex justify-between items-center px-4 py-3 rounded-md text-base font-medium transition-colors duration-300 ${
+                      isFootballSectionActive
+                        ? 'bg-brand-green text-white'
+                        : 'text-gray-300 hover:bg-brand-gray hover:text-white'
+                    }`}
+                  >
+                    축구부
+                    <svg className={`w-5 h-5 transition-transform duration-300 ${isFootballSubMenuOpen ? 'transform rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </button>
+                  <div className={`${isFootballSubMenuOpen ? 'block' : 'hidden'} mt-1 pl-4 space-y-1`}>
+                    <button onClick={() => handleMobileLinkClick('coaching-staff')} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-brand-dark hover:text-white cursor-pointer rounded-md">코치진</button>
+                    <button onClick={() => handleMobileLinkClick('grade-1')} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-brand-dark hover:text-white cursor-pointer rounded-md">1학년</button>
+                    <button onClick={() => handleMobileLinkClick('grade-2')} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-brand-dark hover:text-white cursor-pointer rounded-md">2학년</button>
+                    <button onClick={() => handleMobileLinkClick('grade-3')} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-brand-dark hover:text-white cursor-pointer rounded-md">3학년</button>
+                    <button onClick={() => handleMobileLinkClick('alumni')} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-brand-dark hover:text-white cursor-pointer rounded-md">자랑스런 졸업생</button>
+                  </div>
+                </div>
+
+                <MobileNavLink section="gallery">갤러리</MobileNavLink>
+                <MobileNavLink section="news">소식</MobileNavLink>
+                <MobileNavLink section="support">후원안내</MobileNavLink>
+              </div>
+            </div>
+          </header>
+        );
+      };
+
+      // App Component
+      const App = () => {
+        const initialNews = [
+          { id: 1, title: '전국 고교 축구선수권대회 4강 진출!', date: '2024-07-15', summary: '이리고 축구부가 막강한 공격력을 선보이며 전국 대회 4강에 오르는 쾌거를 이루었습니다.' },
+          { id: 2, title: '주장 김민준, "우승 향한 열망으로 뭉쳤다"', date: '2024-07-12', summary: '팀의 주장이자 에이스인 김민준 선수가 우승에 대한 강한 자신감을 내비쳤습니다.' },
+          { id: 3, title: '후원회, 선수단에 격려 물품 전달', date: '2024-07-10', summary: '후원회에서 선수들의 사기 진작을 위해 훈련 용품과 간식을 전달하며 격려했습니다.' },
+        ];
+
+        const coachingStaff = [
+          { id: 1, name: '김감독', role: '감독', imageUrl: 'https://picsum.photos/seed/coach1/400/500' },
+          { id: 2, name: '박수석', role: '수석코치', imageUrl: 'https://picsum.photos/seed/coach2/400/500' },
+          { id: 3, name: '최골키퍼', role: '골키퍼 코치', imageUrl: 'https://picsum.photos/seed/coach3/400/500' },
+        ];
+
+        const initialPlayers = [
+            // 3학년
+            { id: 1, name: '김민준', position: '공격수 (FW)', number: 10, imageUrl: 'https://picsum.photos/seed/player1/400/500', grade: 3 },
+            { id: 2, name: '이현우', position: '미드필더 (MF)', number: 8, imageUrl: 'https://picsum.photos/seed/player2/400/500', grade: 3 },
+            // 2학년
+            { id: 3, name: '박서준', position: '수비수 (DF)', number: 4, imageUrl: 'https://picsum.photos/seed/player3/400/500', grade: 2 },
+            { id: 4, name: '최지훈', position: '골키퍼 (GK)', number: 1, imageUrl: 'https://picsum.photos/seed/player4/400/500', grade: 2 },
+            { id: 7, name: '강지석', position: '공격수 (FW)', number: 11, imageUrl: 'https://picsum.photos/seed/player7/400/500', grade: 2 },
+            { id: 8, name: '서예준', position: '미드필더 (MF)', number: 6, imageUrl: 'https://picsum.photos/seed/player8/400/500', grade: 2 },
+            // 1학년
+            { id: 5, name: '정태양', position: '미드필더 (MF)', number: 7, imageUrl: 'https://picsum.photos/seed/player5/400/500', grade: 1 },
+            { id: 6, name: '윤도현', position: '수비수 (DF)', number: 5, imageUrl: 'https://picsum.photos/seed/player6/400/500', grade: 1 },
+            { id: 9, name: '하다온', position: '수비수 (DF)', number: 2, imageUrl: 'https://picsum.photos/seed/player9/400/500', grade: 1 },
+            { id: 10, name: '김주원', position: '미드필더 (MF)', number: 9, imageUrl: 'https://picsum.photos/seed/player10/400/500', grade: 1 },
+        ];
+
+        const alumni = [
+            { id: 1, name: '손흥민 선배', graduationYear: 2010, currentTeam: '토트넘 홋스퍼 FC', imageUrl: 'https://picsum.photos/seed/alumni1/400/500' },
+            { id: 2, name: '박지성 선배', graduationYear: 2000, currentTeam: '은퇴 (전 맨유)', imageUrl: 'https://picsum.photos/seed/alumni2/400/500' },
+            { id: 3, name: '김민재 선배', graduationYear: 2015, currentTeam: 'FC 바이에른 뮌헨', imageUrl: 'https://picsum.photos/seed/alumni3/400/500' },
+            { id: 4, name: '이강인 선배', graduationYear: 2018, currentTeam: '파리 생제르맹 FC', imageUrl: 'https://picsum.photos/seed/alumni4/400/500' },
+        ];
+        
+        const [activeSection, setActiveSection] = useState('home');
+        const [news, setNews] = useState(initialNews);
+        const [isGenerating, setIsGenerating] = useState(false);
+        const [error, setError] = useState(null);
+
+        const handleGenerateNews = useCallback(async () => {
+          setIsGenerating(true);
+          setError(null);
+          try {
+            const prompt = "Write a short, exciting news report about a fictional high school football match where Iri High School won. The opponent was '강호고등학교'. Include a catchy Korean headline and a brief summary of the game's key moments. The response must be in JSON format with 'title' and 'summary' keys.";
+            const newArticleText = await generateNewsArticle(prompt);
+            
+            const jsonString = newArticleText.replace(/^```json\s*|```\s*$/g, '').trim();
+            const newArticleContent = JSON.parse(jsonString);
+
+            const newArticle = {
+              id: news.length + 1,
+              title: newArticleContent.title,
+              summary: newArticleContent.summary,
+              date: new Date().toISOString().split('T')[0],
+            };
+            setNews(prevNews => [newArticle, ...prevNews]);
+          } catch (err) {
+            console.error("Failed to generate news:", err);
+            setError("AI 기사 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
+          } finally {
+            setIsGenerating(false);
+          }
+        }, [news]);
+
+        const renderSection = () => {
+          switch (activeSection) {
+            case 'news':
+              return <NewsSection news={news} onGenerate={handleGenerateNews} isGenerating={isGenerating} error={error} showTitle={true} />;
+            case 'gallery':
+              return <GallerySection />;
+            case 'organization':
+              return <OrganizationSection />;
+            case 'sponsors':
+              return <SponsorsSection />;
+            case 'support':
+              return <SupportSection />;
+            case 'coaching-staff':
+              return <CoachingStaffSection coaches={coachingStaff} />;
+            case 'grade-1':
+              return <PlayersSection players={initialPlayers.filter(p => p.grade === 1)} title="1학년 선수단" showTitle={true} />;
+            case 'grade-2':
+              return <PlayersSection players={initialPlayers.filter(p => p.grade === 2)} title="2학년 선수단" showTitle={true} />;
+            case 'grade-3':
+              return <PlayersSection players={initialPlayers.filter(p => p.grade === 3)} title="3학년 선수단" showTitle={true} />;
+            case 'alumni':
+              return <AlumniSection alumni={alumni} />;
+            case 'home':
+            default:
+              return (
+                <>
+                  <Hero onNavigate={setActiveSection}/>
+                  <NewsSection news={news.slice(0, 3)} onGenerate={handleGenerateNews} isGenerating={isGenerating} error={error} showTitle={true} />
+                  <PlayersSection players={initialPlayers.slice(0, 4)} showTitle={true} />
+                </>
+              );
+          }
+        };
+
+        return (
+          <div className="bg-brand-dark min-h-screen text-brand-light font-sans">
+            <Header activeSection={activeSection} setActiveSection={setActiveSection} />
+            <main>
+              {renderSection()}
+            </main>
+            <Footer />
+          </div>
+        );
+      };
+
+      // Render the App
+      const rootElement = document.getElementById('root');
+      if (rootElement) {
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(<App />);
+      } else {
+        console.error("Could not find root element to mount to");
+      }
+
+    </script>
 </body>
 </html>
